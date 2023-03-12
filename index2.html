@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Line Chart with D3.js</title>
+    <style>
+        /* 定义轴和线的样式 */
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #aaa;
+            shape-rendering: crispEdges;
+        }
+
+        .axis text {
+            font-family: sans-serif;
+            font-size: 11px;
+            fill: #999;
+        }
+
+        .line {
+            fill: none;
+            stroke: steelblue;
+            stroke-width: 1.5px;
+        }
+    </style>
+</head>
+<body>
+//复选框定位
+<div></div>
+<div>
+    <button id="clear-all">取消全部选中</button>
+</div>
+<!-- 创建 SVG 容器 -->
+<svg width="960" height="500"></svg>
+<!-- 引入 D3.js 库 -->
+<script src="d3.v7.min.js"></script>
+<script>
+    // 设置图表的尺寸和边距
+    const margin = {top: 20, right: 30, bottom: 30, left: 50},
+        width = 960 - margin.left - margin.right,
+        height = 500 - margin.top - margin.bottom;
+
+    // 解析时间数据
+    const parseTime = d3.timeParse("%Y");
+
+    // 定义比例尺
+    const x = d3.scaleTime().range([0, width]);
+    const y = d3.scaleLinear().range([height, 0]);
+
+    // 定义线段函数
+    const line = d3.line()
+        .x(function (d) {
+            return x(d.year);
+        })
+        .y(function (d) {
+            return y(d.energy);
+        });
+
+    // 在页面上添加 SVG 元素
+    const svg = d3.select("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    // 获取数据
+    d3.csv("low-carbon-energy-consumption.csv").then(function (data) {
+        console.log(data)
+
+        const COUNTRY = [...new Set(data.map(function (d) {
+            return d.Entity;
+        }))].sort();
+        console.log(COUNTRY)
+        console.log(d3.group(data, d => d.Entity))
+
+        const checkboxGroup = d3.select("div")
+            .selectAll("div")
+            .data(COUNTRY)
+            .enter()
+            .append("div")
+            .style("display", "inline-block");
+
+        checkboxGroup.append("input")
+            .attr("type", "checkbox")
+            .attr("id", function (d) {
+                return "checkbox-" + d;
+            })
+            .attr("value", function (d) {
+                return d;
+            })
+            .property("checked", true)
+            .on("change", updateChart);
+
+        checkboxGroup.append("label")
+            .attr("for", function (d) {
+                return "checkbox-" + d;
+            })
+            .text(function (d) {
+                return d;
+            });
+
+        // 格式化数据
+        data.forEach(function (d) {
+            d.year = parseTime(d.Year);
+            d.energy = +d["Low-carbon energy (TWh - equivalent)"];
+        });
+
+        filteredData = d3.group(data, d => d.Entity)
+        console.log(filteredData)
+        // 设置比例尺的域
+        x.domain(d3.extent(data, function (d) {
+            return d.year;
+        }));
+        y.domain([0, d3.max(data, function (d) {
+            return d.energy;
+        })]);
+
+        filteredData.forEach(d => {
+            // console.log(d)
+            // 添加线段路径
+            svg.append("path")
+                .data([d])
+                .attr("class", "line")
+                .attr("d", line);
+        })
+
+        // 添加 X 轴
+        svg.append("g")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x))
+            .attr('class','x-axis');
+
+        // 添加 Y 轴
+        svg.append("g")
+            .call(d3.axisLeft(y))
+            .attr('class','y-axis');
+
+        //取消全部选中
+        const clearAllButton = d3.select("#clear-all");
+
+        clearAllButton.on("click", function () {
+            // 取消所有复选框的选择
+            d3.selectAll("input[type=checkbox]")
+                .property("checked", false)
+                .dispatch("change");
+
+            // 选择并删除所有线段
+            svg.selectAll(".line").remove();
+        });
+        function updateChart() {
+            svg.selectAll(".line").remove();
+            // 获取所有已选中的国家
+            const selectedCountries = d3.selectAll("input[type=checkbox]:checked").nodes().map(function(d) {
+                return d.value;
+            });
+            console.log(selectedCountries)
+            // 从原始数据中过滤出已选中的国家对应的数据
+            const filteredData1 = data.filter(function(d) {
+                return selectedCountries.includes(d.Entity);
+            });
+
+            // 格式化过滤后的数据
+            filteredData1.forEach(function(d) {
+                d.year = parseTime(d.Year);
+                d.energy = +d["Low-carbon energy (TWh - equivalent)"];
+            });
+
+            if (selectedCountries.length > 0) {
+                // 更新比例尺的域
+                x.domain(d3.extent(filteredData1, function(d) {
+                    return d.year;
+                }));
+                y.domain([0, d3.max(filteredData1, function(d) {
+                    return d.energy;
+                })]);
+                // 更新 X 轴
+                svg.select(".x-axis")
+                    .transition()
+                    .duration(1000)
+                    .call(d3.axisBottom(x));
+
+                // 更新 Y 轴
+                svg.select(".y-axis")
+                    .transition()
+                    .duration(1000)
+                    .call(d3.axisLeft(y));
+            }
+
+            const filteredData2 = d3.group(filteredData1,d=>d.Entity)
+            console.log(filteredData2)
+
+
+            // 更新线段路径
+            if (selectedCountries.length > 0) {
+                filteredData2.forEach(d=>{
+                    // 这里需要加判断，新建一个数组，把已经绘制过的线的国家名存进来，然后判断，未在里面的国家，重新绘制线，已经绘制过的国家，更新对应域的线
+                    svg.append("path")
+                        .data([d])
+                        .attr("class", "line")
+                        .attr("d", line);
+                })
+            } else {
+                svg.selectAll(".line")
+                    .style("opacity", 0);
+            }
+        }
+    });
+</script>
+</body>
+</html>
