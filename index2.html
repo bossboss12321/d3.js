@@ -26,7 +26,7 @@
     </style>
 </head>
 <body>
-//复选框定位
+<!--复选框定位-->
 <div></div>
 <div>
     <button id="clear-all">取消全部选中</button>
@@ -68,6 +68,7 @@
     d3.csv("low-carbon-energy-consumption.csv").then(function (data) {
         console.log(data)
 
+        //把国家数据存入COUNTRY
         const COUNTRY = [...new Set(data.map(function (d) {
             return d.Entity;
         }))].sort();
@@ -106,8 +107,6 @@
             d.energy = +d["Low-carbon energy (TWh - equivalent)"];
         });
 
-        filteredData = d3.group(data, d => d.Entity)
-        console.log(filteredData)
         // 设置比例尺的域
         x.domain(d3.extent(data, function (d) {
             return d.year;
@@ -115,15 +114,6 @@
         y.domain([0, d3.max(data, function (d) {
             return d.energy;
         })]);
-
-        filteredData.forEach(d => {
-            // console.log(d)
-            // 添加线段路径
-            svg.append("path")
-                .data([d])
-                .attr("class", "line")
-                .attr("d", line);
-        })
 
         // 添加 X 轴
         svg.append("g")
@@ -135,6 +125,22 @@
         svg.append("g")
             .call(d3.axisLeft(y))
             .attr('class','y-axis');
+
+        //数据根据国家分组
+        let filteredData = d3.group(data, d => d.Entity)
+        console.log(filteredData)
+
+        //生成线段
+        filteredData.forEach(d => {
+            // console.log(d)
+            // 添加线段路径
+            svg.append("path")
+                .data([d])
+                .attr("class", "line")
+                .attr("d", line);
+        })
+
+
 
         //取消全部选中
         const clearAllButton = d3.select("#clear-all");
@@ -148,6 +154,8 @@
             // 选择并删除所有线段
             svg.selectAll(".line").remove();
         });
+
+        //更新图表
         function updateChart() {
             svg.selectAll(".line").remove();
             // 获取所有已选中的国家
